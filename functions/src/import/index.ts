@@ -79,11 +79,28 @@ const processQuery = async querySnapshot => {
   }
 }
 
-const retrieveDataFromFirestore = async () => {
-  const collectionPathParts = config.collectionPath.split('/');
-  const collectionPath = collectionPathParts[collectionPathParts.length - 1];
-  const querySnapshot = await database.collectionGroup(collectionPath).get();
-  processQuery(querySnapshot).catch(console.error);
+const retrieveChunk = async (lastVisible, maxLength) => {
+    const collectionPathParts = config_1.default.collectionPath.split('/');
+    const collectionPath = collectionPathParts[collectionPathParts.length - 1];
+    let querySnapshot;
+
+    if (lastVisible) {
+        querySnapshot = await database.collection(collectionPath).limit(maxLength).startAfter(lastVisible).get();
+    }
+    else {
+        querySnapshot = await database.collection(collectionPath).limit(maxLength).get();
+    }
+
+    processQuery(querySnapshot).catch(console.error);
+    
+    return [querySnapshot.docs[querySnapshot.docs.length - 1], querySnapshot.docs.length];
+};
+
+const retrieveDataFromFirestore = async (lastVisible=null) => {
+    const maxLength = 100;
+    const [keepGoing, length] = await retrieveChunk(lastVisible, maxLength);
+    console.log("LENGTH", length);
+    if (length == maxLength) retrieveDataFromFirestore(keepGoing);
 };
 
 const doesPathMatchConfigCollectionPath = (path: string): boolean => {
