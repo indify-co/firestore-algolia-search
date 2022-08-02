@@ -71,12 +71,31 @@ const processQuery = async (querySnapshot) => {
         sentDataToAlgolia(records);
     }
 };
-const retrieveDataFromFirestore = async () => {
+
+const retrieveChunk = async (lastVisible, maxLength) => {
     const collectionPathParts = config_1.default.collectionPath.split('/');
     const collectionPath = collectionPathParts[collectionPathParts.length - 1];
-    const querySnapshot = await database.collectionGroup(collectionPath).get();
+    let querySnapshot;
+
+    if (lastVisible) {
+        querySnapshot = await database.collection(collectionPath).limit(maxLength).startAfter(lastVisible).get();
+    }
+    else {
+        querySnapshot = await database.collection(collectionPath).limit(maxLength).get();
+    }
+
     processQuery(querySnapshot).catch(console.error);
+    
+    return [querySnapshot.docs[querySnapshot.docs.length - 1], querySnapshot.docs.length];
 };
+
+const retrieveDataFromFirestore = async (lastVisible=null) => {
+    const maxLength = 100;
+    const [keepGoing, length] = await retrieveChunk(lastVisible, maxLength);
+    console.log("LENGTH", length);
+    if (length == maxLength) retrieveDataFromFirestore(keepGoing);
+};
+
 const doesPathMatchConfigCollectionPath = (path) => {
     const pathSegments = path.split('/');
     const collectionPathSegments = config_1.default.collectionPath.split('/');
@@ -86,6 +105,7 @@ const doesPathMatchConfigCollectionPath = (path) => {
         return configSegment.match(/{.*?}/) !== null || configSegment === pathSegments[i];
     });
 };
+
 retrieveDataFromFirestore()
     .catch(error => {
     logs.error(error);
